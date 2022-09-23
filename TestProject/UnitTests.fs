@@ -10,6 +10,14 @@ let Setup () = ()
 let GigaByte x = x
 let TeraByte x = 1000UL * GigaByte x
 
+let assertTotal expected meter =
+    Assert.AreEqual(expected, meter.Total)
+    meter
+
+let assertConsumption expected (meter: WaterfallMeter) =
+    Assert.AreEqual(expected, meter.Consumption)
+    meter
+
 [<Test>]
 let CreateMeterWithIncludedQuantities () =
     let meter =
@@ -26,7 +34,7 @@ let CreateMeterWithIncludedQuantities () =
     let expected = 
         { Total = 0UL; Consumption = Map.empty 
           Model = [
-            FreeIncluded                   100UL
+            FreeIncluded               (GigaByte 100UL)
             Range {   LowerIncluding =     100UL; UpperExcluding =  10_100UL; DimensionId = "Next 10TB / Month";  }
             Range {   LowerIncluding =  10_100UL; UpperExcluding =  50_100UL; DimensionId = "Next 40TB / Month" };
             Range {   LowerIncluding =  50_100UL; UpperExcluding = 150_100UL; DimensionId = "Next 100TB / Month"; };
@@ -35,6 +43,21 @@ let CreateMeterWithIncludedQuantities () =
           ] }
 
     Assert.AreEqual(expected, meter)
+
+    meter
+    |> consume (GigaByte 50UL)
+    |> assertTotal 50UL
+    |> assertConsumption Map.empty
+    |> consume (GigaByte 49UL)
+    |> assertTotal 99UL
+    |> assertConsumption Map.empty
+    |> consume (GigaByte 2UL)
+    |> assertTotal 101UL
+    |> assertConsumption (Map.empty |> Map.add "Next 10TB / Month"  (GigaByte 1UL))
+    |> consume (GigaByte 1UL)
+    |> assertTotal 102UL
+    |> assertConsumption (Map.empty |> Map.add "Next 10TB / Month"  (GigaByte 2UL))
+    |> ignore
 
 [<Test>]
 let CreateMeterWithOutIncludedQuantities () =
@@ -62,33 +85,3 @@ let CreateMeterWithOutIncludedQuantities () =
           ] }
 
     Assert.AreEqual(expected, meter)
-
-[<Test>]
-let Test1 () =
-
-    let assertTotal (expected: Quantity) (meter: WaterfallMeter) : WaterfallMeter =
-        NUnit.Framework.Assert.AreEqual(expected, meter.Total)
-        meter
-
-    let meter =
-        [
-            // { Begin = GigaByte 0UL ; Name = "First 100GB / Month" }
-            { Begin = GigaByte 100UL; Name = "Next 10TB / Month" }
-            { Begin = TeraByte  10UL; Name = "Next 40TB / Month" }
-            { Begin = TeraByte  40UL; Name = "Next 100TB / Month" }
-            { Begin = TeraByte 100UL; Name = "Next 350TB / Month" }
-            { Begin = TeraByte 350UL; Name = "Overage over 500TB" }
-        ]
-        |> create
-        |> setTotal (0UL)
-        |> consume (GigaByte 100UL)
-        |> assertTotal 100UL
-        |> consume (GigaByte 1UL)
-        |> assertTotal 101UL
-
-
-    meter
-    |> (fun x -> x.Consumption)
-    |> Map.toList
-    |> List.map (fun (did, q) -> $"{did}: {q}")
-    |> List.iter (fun x -> printfn "%s" x)
