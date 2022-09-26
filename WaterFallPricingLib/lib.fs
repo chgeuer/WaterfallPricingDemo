@@ -2,21 +2,6 @@
 
 open System
 
-module Helpers =
-    let inspect header a =
-        if String.IsNullOrEmpty header 
-        then printfn "%s" a
-        else printfn "%s: %s" header a
-    
-        a
-
-    let inspecto (header: string) (a: 'a) : 'a =
-        if String.IsNullOrEmpty header 
-        then printfn "%A" a
-        else printfn "%s: %A" header a
-    
-        a
-
 type Quantity = uint64
 type DimensionId = string
 
@@ -38,15 +23,15 @@ type WaterfallModelRow =
   | Range of Range
   | Overage of Overage
 
-type WaterfallDescription = 
+type WaterfallDescription =
   WaterfallDescriptionItem list
+
 type WaterfallModel = 
   WaterfallModelRow list
 
 module WaterfallModel =
   let expand (model: WaterfallDescription) : WaterfallModel =
     let len = model |> List.length
-    
     let expanded =
       [0 .. len - 1]
       |> List.map (fun i -> 
@@ -77,8 +62,10 @@ module WaterfallModel =
       |> List.last
       |> fun i -> { DimensionId = i.Name; LowerIncluding = i.Begin }
       |> Overage
-
-    included :: (ranges @ [overage])
+       
+    match included with
+    | FreeIncluded x when x > 0UL -> included :: (ranges @ [overage])
+    | _ -> (ranges @ [overage])
   
   let display : (WaterfallModelRow -> DimensionId * string) = function
     | FreeIncluded x -> ("Free", $"{x}")
